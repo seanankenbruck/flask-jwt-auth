@@ -1,11 +1,39 @@
 # project/server/auth/views.py
 
-from flask import Blueprint, request, make_response, jsonify
+from flask import Blueprint, request, redirect, session, url_for, render_template, make_response, jsonify
 from flask.views import MethodView
 from project.server import bcrypt, db
 from project.server.models import User, BlacklistToken
 
 auth_blueprint = Blueprint('auth', __name__)
+
+class HomePage(MethodView):
+	"""
+	Application Home Page
+	"""
+	def get(self):
+		return render_template('home.html')
+
+class LandingPage(MethodView):
+	"""
+	Application Landing Page
+	"""
+	def get(self):
+		return render_template('landing.html')
+
+class LoginPage(MethodView):
+	"""
+	Application Login Page
+	"""
+	def get(self):
+		return render_template('login.html')
+
+class RegistrationPage(MethodView):
+	"""
+	Application Registration Page
+	"""
+	def get(self):
+		return render_template('register.html')
 
 class RegisterAPI(MethodView):
     """
@@ -14,7 +42,13 @@ class RegisterAPI(MethodView):
 
     def post(self):
         # get the post data
-        post_data = request.get_json()
+        if request.form:
+        	post_data = {
+				'email': request.form['email'],
+				'password' : request.form['password']
+			}
+        else:
+        	post_data = request.get_json()
         # check if user already exists
         user = User.query.filter_by(email=post_data.get('email')).first()
         if not user:
@@ -54,7 +88,13 @@ class LoginAPI(MethodView):
 	"""
 	def post(self):
 		# get post data
-		post_data = request.get_json()
+		if request.form:
+			post_data = {
+				'email': request.form['email'],
+				'password' : request.form['password']
+			}
+		else:
+			post_data = request.get_json()
 		try:
 			# fetch the user data
 			user = User.query.filter_by(
@@ -69,7 +109,9 @@ class LoginAPI(MethodView):
 							'message' : 'Successfully logged in.',
 							'auth_token' : auth_token.decode()
 						}
-						return make_response(jsonify(responseObject)), 200
+						session['auth_token'] = responseObject['auth_token']
+						session['headers'] = {"Authorization": "Bearer " + session['auth_token'], "Accept" : "application/json"}
+						return render_template('home.html', data = responseObject)
 				else:
 					responseObject = {
 						'status' : 'fail',
@@ -95,7 +137,8 @@ class UserAPI(MethodView):
 	User Resource
 	"""
 	def get(self):
-		auth_header = request.headers.get('Authorization')
+		#auth_header = request.headers.get('Authorization')
+		auth_header = session['headers']['Authorization']
 		if auth_header:
 			try:
 				auth_token = auth_header.split(" ")[1]
@@ -120,7 +163,7 @@ class UserAPI(MethodView):
                         'registered_on': user.registered_on
                     }
                 }
-				return make_response(jsonify(responseObject)), 200
+				return render_template('home.html', data = responseObject)
 			responseObject = {
 				'status': 'fail',
 				'message': resp
@@ -139,7 +182,8 @@ class LogoutAPI(MethodView):
 	"""
 	def post(self):
 		# get auth token
-		auth_header = request.headers.get('Authorization')
+		#auth_header = request.headers.get('Authorization')
+		auth_header = session['headers']['Authorization']
 		if auth_header:
 			auth_token = auth_header.split(" ")[1]
 		else:
@@ -178,12 +222,37 @@ class LogoutAPI(MethodView):
 			return make_response(jsonify(responseObject)), 403
 
 # define the API resources
+landing_page_view = LandingPage.as_view('landing_page_view')
+home_page_view = HomePage.as_view('home_page_view')
+login_page_view = LoginPage.as_view('login_page_view')
+registration_page_view = RegistrationPage.as_view('registration_page_view')
+
 registration_view = RegisterAPI.as_view('register_api')
 login_view = LoginAPI.as_view('login_api')
 user_view = UserAPI.as_view('user_api')
 logout_view = LogoutAPI.as_view('logout_api')
 
 # add Rules for API Endpoints
+auth_blueprint.add_url_rule(
+    '/',
+    view_func=landing_page_view,
+    methods=['GET']
+)
+auth_blueprint.add_url_rule(
+    '/home',
+    view_func=home_page_view,
+    methods=['GET']
+)
+auth_blueprint.add_url_rule(
+    '/login',
+    view_func=login_page_view,
+    methods=['GET']
+)
+auth_blueprint.add_url_rule(
+    '/register',
+    view_func=registration_page_view,
+    methods=['GET']
+)
 auth_blueprint.add_url_rule(
     '/auth/register',
     view_func=registration_view,

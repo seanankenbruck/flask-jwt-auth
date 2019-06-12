@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+   <body>
+      <table border = 1>
+         {% if data %}
+            {% for key, value in data.items() %}
+               <tr>
+                  <th> {{ key }} </th>
+                  <td> {{ value }} </td>
+               </tr>
+            {% endfor %}
+         {% endif %}
+      </table>
+      <form action="/auth/logout" method="post">
+    <input type="submit" value="logout" />
+</form>
+   </body>
+</html>
